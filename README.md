@@ -53,6 +53,12 @@ pip install opencv-python numpy pytesseract Pillow
    
    # On macOS
    brew install tesseract tesseract-lang
+   
+   # On Windows
+   # Download and install Tesseract OCR from https://github.com/UB-Mannheim/tesseract/wiki
+   # Make sure to check "Additional language data" during installation and select French
+   # Or download French language data (fra.traineddata) from https://github.com/tesseract-ocr/tessdata
+   # and place it in your Tesseract data directory (typically C:\\Program Files\\Tesseract-OCR\\tessdata)
    ```
 
 ## Usage
