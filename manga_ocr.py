@@ -83,9 +83,17 @@ class MangaTextExtractor:
         try:
             pytesseract.get_tesseract_version()
         except EnvironmentError:
+            import platform
+            system = platform.system()
             print("Tesseract OCR is not installed. Please install it:")
-            print("  sudo apt-get install tesseract-ocr")
-            print("  sudo apt-get install tesseract-ocr-fra")
+            if system == "Windows":
+                print("  Download from: https://github.com/UB-Mannheim/tesseract/wiki")
+                print("  Make sure to check 'Additional language data' and select French")
+            elif system == "Darwin":
+                print("  brew install tesseract tesseract-lang")
+            else:
+                print("  sudo apt-get install tesseract-ocr")
+                print("  sudo apt-get install tesseract-ocr-fra")
             print("  pip install pytesseract")
             sys.exit(1)
         
@@ -670,10 +678,18 @@ def check_dependencies() -> bool:
     try:
         pytesseract.get_tesseract_version()
     except EnvironmentError:
+        import platform
+        system = platform.system()
         print("Tesseract OCR is not installed.")
         print("Install it with:")
-        print("  sudo apt-get install tesseract-ocr")
-        print("  sudo apt-get install tesseract-ocr-fra")
+        if system == "Windows":
+            print("  Download from: https://github.com/UB-Mannheim/tesseract/wiki")
+            print("  Make sure to check 'Additional language data' and select French")
+        elif system == "Darwin":
+            print("  brew install tesseract tesseract-lang")
+        else:
+            print("  sudo apt-get install tesseract-ocr")
+            print("  sudo apt-get install tesseract-ocr-fra")
         return False
     
     return True
