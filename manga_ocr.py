@@ -101,8 +101,13 @@ class MangaTextExtractor:
         if self.tessdata_prefix:
             os.environ['TESSDATA_PREFIX'] = self.tessdata_prefix
         
-        # Configure Tesseract to use French language
-        self.tesseract_config = r'--oem 3 --psm 6 -l fra+eng'
+        # Configure Tesseract to use French language with comic/manga optimizations
+        # --oem 3 = LSTM + Legacy OCR engine (best for most cases)
+        # --psm 6 = Assume a single uniform block of text (good for speech bubbles)
+        # For comic fonts, we add specific configurations:
+        # - c = preserve_interword_spaces (helps with comic lettering)
+        # - textord_tabfind_force_merge = 1 (better for speech bubbles)
+        self.tesseract_config = r'--oem 3 --psm 6 -l fra+eng -c preserve_interword_spaces=1 textord_tabfind_force_merge=1'
         if self.use_gpu:
             self.tesseract_config += ' --tessdata-dir /usr/share/tesseract-ocr/4.00/tessdata'
     
@@ -363,23 +368,79 @@ class MangaTextExtractor:
             print(f"Error extracting text from region {region}: {e}")
             return "", 0.0
     
+    def _should_invert_region(self, region: np.ndarray) -> bool:
+        """
+        Determine if a region has light text on dark background.
+        Handles various manga text styles including white on black, white on red, etc.
+        """
+        if len(region.shape) == 2:  # Already grayscale
+            gray = region
+        else:
+            gray = cv2.cvtColor(region, cv2.COLOR_RGB2GRAY)
+        
+        # Calculate mean intensity
+        mean_intensity = np.mean(gray)
+        
+        # If the background is dark (mean < 128), text is likely light
+        # This handles white on black, white on red, white on dark blue, etc.
+        if mean_intensity < 128:
+            return True
+        
+        # Additional check: if we have high contrast with dark background
+        # Calculate standard deviation to check for bimodal distribution
+        std_dev = np.std(gray)
+        if std_dev > 60 and mean_intensity < 150:
+            return True
+        
+        return False
+    
     def _preprocess_region(self, region: np.ndarray) -> np.ndarray:
-        """Preprocess a cropped region for OCR"""
+        """Preprocess a cropped region for OCR with font and contrast optimizations"""
         # Convert to grayscale
         if len(region.shape) == 3:
             gray = cv2.cvtColor(region, cv2.COLOR_RGB2GRAY)
         else:
             gray = region
         
-        # Apply thresholding
-        _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        # Check if we need to invert (light text on dark background)
+        should_invert = self._should_invert_region(region)
+        
+        # For manga/comic fonts: apply font-specific preprocessing
+        # Digital Comic Sans and similar fonts benefit from sharpening
+        if len(region.shape) == 3:
+            # Apply slight sharpening for comic-style fonts
+            blurred = cv2.GaussianBlur(region, (0, 0), 3)
+            sharpened = cv2.addWeighted(region, 1.5, blurred, -0.5, 0)
+            gray = cv2.cvtColor(sharpened, cv2.COLOR_RGB2GRAY)
+        
+        # Handle inverted text (white on black/red/dark backgrounds)
+        if should_invert:
+            # Invert the image for Tesseract (expects dark text on light background)
+            gray = cv2.bitwise_not(gray)
+        
+        # Apply adaptive thresholding for better text separation
+        # Use different methods based on background
+        if should_invert:
+            # For inverted text, use regular thresholding after inversion
+            _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        else:
+            # For normal text, use inverse thresholding
+            _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
         
         # Apply morphological operations to clean up
-        kernel = np.ones((2, 2), np.uint8)
+        # Use slightly larger kernel for comic fonts
+        kernel = np.ones((3, 3), np.uint8)
         cleaned = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=1)
         
-        # Invert back
-        cleaned = cv2.bitwise_not(cleaned)
+        # For comic fonts, also try closing to connect broken strokes
+        cleaned = cv2.morphologyEx(cleaned, cv2.MORPH_CLOSE, kernel, iterations=1)
+        
+        # Invert back if we had inverted text
+        if should_invert:
+            cleaned = cv2.bitwise_not(cleaned)
+        
+        if self.debug:
+            cv2.imwrite(f"{self.temp_dir}/preprocessed_region.jpg", cleaned)
         
         return cleaned
     
