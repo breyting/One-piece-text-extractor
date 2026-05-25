@@ -643,12 +643,18 @@ class MangaTextExtractor:
 
 def check_dependencies() -> bool:
     """Check if all required dependencies are installed"""
-    required_packages = ['opencv-python', 'numpy', 'pytesseract', 'Pillow']
+    # Map package names to their import names
+    required_packages = [
+        ('opencv-python', 'cv2'),
+        ('numpy', 'numpy'),
+        ('pytesseract', 'pytesseract'),
+        ('Pillow', 'PIL')
+    ]
     missing = []
     
-    for package in required_packages:
+    for package, import_name in required_packages:
         try:
-            __import__(package.split('-')[0])
+            __import__(import_name)
         except ImportError:
             missing.append(package)
     
