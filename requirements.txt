@@ -1,0 +1,16 @@
+# Manga Text Extractor Requirements
+# For French One Piece manga OCR
+
+# Core dependencies
+opencv-python>=4.5.0
+numpy>=1.21.0
+pytesseract>=0.3.8
+Pillow>=8.3.0
+
+# Optional dependencies for better performance
+# opencv-contrib-python>=4.5.0  # For additional OpenCV modules
+# pytesseract[all]  # Includes all dependencies
+
+# For GPU acceleration (optional)
+# cupy-cuda11x  # CUDA 11.x support
+# Or install the appropriate version for your CUDA version
